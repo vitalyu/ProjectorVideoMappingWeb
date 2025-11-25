@@ -2,6 +2,8 @@
 
 A powerful, browser-based projection mapping tool built with WebGL. Create stunning visual projections by mapping videos, images, or camera feeds onto any surface with precise 4-corner perspective correction.
 
+![Demo](demo.gif)
+
 ## Features
 
 - **Multi-Layer Support** - Work with multiple layers simultaneously for complex compositions
