@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Browser-based projection mapping tool with WebGL. Map videos, images, and camera feeds onto any surface with real-time perspective correction.">
+<title>Projection Mapping Web - Free Online Video Mapping Tool</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #eee; 
+  font-family: system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.container {
+  max-width: 900px;
+  width: 100%;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+h1 {
+  font-size: 3.5rem;
+  color: #0f9;
+  margin-bottom: 16px;
+  text-shadow: 0 0 20px rgba(0, 255, 153, 0.3);
+}
+
+.tagline {
+  font-size: 1.25rem;
+  color: #aaa;
+  font-weight: 300;
+}
+
+.hero {
+  background: rgba(22, 33, 62, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 255, 153, 0.2);
+  border-radius: 12px;
+  padding: 48px;
+  margin-bottom: 48px;
+  text-align: center;
+}
+
+.hero p {
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: #ccc;
+  margin-bottom: 32px;
+}
+
+.cta-button {
+  display: inline-block;
+  padding: 16px 48px;
+  background: #0f9;
+  color: #000;
+  text-decoration: none;
+  font-size: 1.25rem;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 255, 153, 0.3);
+}
+
+.cta-button:hover {
+  background: #0da;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 30px rgba(0, 255, 153, 0.4);
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+.feature {
+  background: rgba(22, 33, 62, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 24px;
+  transition: all 0.3s ease;
+}
+
+.feature:hover {
+  border-color: rgba(0, 255, 153, 0.3);
+  transform: translateY(-4px);
+}
+
+.feature-icon {
+  font-size: 2rem;
+  margin-bottom: 12px;
+}
+
+.feature h3 {
+  color: #0f9;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+.feature p {
+  color: #aaa;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.tech-stack {
+  background: rgba(22, 33, 62, 0.3);
+  border-radius: 8px;
+  padding: 32px;
+  text-align: center;
+}
+
+.tech-stack h2 {
+  color: #0f9;
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+}
+
+.tech-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.tech-badge {
+  background: rgba(0, 255, 153, 0.1);
+  border: 1px solid rgba(0, 255, 153, 0.3);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  color: #0f9;
+}
+
+footer {
+  text-align: center;
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #666;
+  font-size: 0.9rem;
+}
+
+footer a {
+  color: #0f9;
+  text-decoration: none;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  h1 { font-size: 2.5rem; }
+  .tagline { font-size: 1rem; }
+  .hero { padding: 32px 24px; }
+  .cta-button { padding: 14px 32px; font-size: 1.1rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🎥 Projection Mapping Web</h1>
+    <p class="tagline">Transform any surface into a dynamic canvas</p>
+  </header>
+
+  <div class="hero">
+    <p>
+      A powerful, browser-based projection mapping tool built with WebGL. 
+      Map videos, images, or live camera feeds onto any surface with precise 
+      4-corner perspective correction. No installation required—just open and create.
+    </p>
+    <a href="app.html" class="cta-button">Launch App →</a>
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🎬</div>
+      <h3>Multi-Layer Support</h3>
+      <p>Work with multiple layers simultaneously for complex visual compositions</p>
+    </div>
+    
+    <div class="feature">
+      <div class="feature-icon">📁</div>
+      <h3>Multiple Sources</h3>
+      <p>Use videos, images, live camera feeds, or solid colors as your content</p>
+    </div>
+    
+    <div class="feature">
+      <div class="feature-icon">🎯</div>
+      <h3>Real-Time Warping</h3>
+      <p>Drag corner points to precisely map content onto any surface shape</p>
+    </div>
+    
+    <div class="feature">
+      <div class="feature-icon">⚡</div>
+      <h3>Hardware Accelerated</h3>
+      <p>Smooth performance powered by WebGL with real-time video playback</p>
+    </div>
+    
+    <div class="feature">
+      <div class="feature-icon">⌨️</div>
+      <h3>Keyboard Shortcuts</h3>
+      <p>Fast workflow with hotkeys for common operations and layer switching</p>
+    </div>
+    
+    <div class="feature">
+      <div class="feature-icon">🌐</div>
+      <h3>No Installation</h3>
+      <p>Runs entirely in your browser—works on any device with WebGL support</p>
+    </div>
+  </div>
+
+  <div class="tech-stack">
+    <h2>Built With Modern Web Technologies</h2>
+    <div class="tech-list">
+      <span class="tech-badge">WebGL</span>
+      <span class="tech-badge">JavaScript ES6+</span>
+      <span class="tech-badge">MediaDevices API</span>
+      <span class="tech-badge">GLSL Shaders</span>
+      <span class="tech-badge">Vanilla JS</span>
+    </div>
+  </div>
+
+  <footer>
+    <p>Open source project • <a href="https://github.com/vitalyu/ProjectorVideoMappingWeb" target="_blank">View on GitHub</a></p>
+  </footer>
+</div>
+</body>
+</html>
