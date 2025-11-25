@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+  background: #1a1a2e; 
+  color: #eee; 
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+}
+#app { position: relative; height: 100%; }
+#controls {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 280px;
+  padding: 14px;
+  background: rgba(22, 33, 62, 0.95);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 100;
+  overflow-y: auto;
+  transform: translateX(0);
+  transition: transform 0.25s ease;
+}
+#controls.hidden { transform: translateX(-100%); }
+h1 { font-size: 15px; color: #0f9; }
+h2 { font-size: 12px; color: #888; margin-top: 6px; }
+button {
+  padding: 7px 10px;
+  border: 1px solid #334;
+  border-radius: 5px;
+  background: #1a1a2e;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+button:hover { background: #2a2a4e; }
+button.primary { background: #0f9; color: #000; font-weight: 600; border: none; }
+button.primary:hover { background: #0da; }
+button.secondary { background: #334; color: #fff; }
+button.secondary:hover { background: #445; }
+.info { font-size: 10px; color: #555; line-height: 1.4; }
+#layers-list { display: flex; flex-direction: column; gap: 5px; }
+.layer-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #1a1a2e;
+  border: 2px solid #334;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.layer-item.active { border-color: #0f9; background: #1a2a3e; }
+.layer-item:hover { border-color: #0f9; }
+.layer-name { flex: 1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.layer-color { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.layer-btn { 
+  background: none; 
+  border: none; 
+  color: #666; 
+  cursor: pointer; 
+  font-size: 14px;
+  padding: 0 3px;
+  width: auto;
+}
+.layer-btn:hover { color: #fff; background: none; }
+.layer-btn.vis { color: #0f9; }
+.layer-btn.vis.off { color: #444; }
+.layer-btn.del:hover { color: #e33; }
+#canvas-wrap { position: absolute; inset: 0; background: #000; }
+canvas { display: block; width: 100%; height: 100%; }
+.corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  z-index: 100;
+  box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  touch-action: none;
+  display: none;
+}
+.corner.visible { display: block; }
+.corner:active { cursor: grabbing; filter: brightness(1.3); }
+.corner::after {
+  content: attr(data-label);
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  color: inherit;
+  white-space: nowrap;
+  font-weight: bold;
+}
+.row { display: flex; gap: 6px; }
+.row > * { flex: 1; }
+.source-btns { display: flex; gap: 4px; margin-top: 6px; }
+.source-btns button { flex: 1; font-size: 11px; padding: 6px 4px; }
+#file-input { display: none; }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="controls">
+    <h1>🎥 Projection Mapping</h1>
+    
+    <div>
+      <h2>Layers</h2>
+      <div id="layers-list"></div>
+      <button id="add-layer-btn" class="primary" style="width:100%;margin-top:6px">+ Add Layer</button>
+    </div>
+    
+    <div>
+      <h2>Layer Source</h2>
+      <div class="source-btns">
+        <button id="src-file">📁 File</button>
+        <button id="src-camera">📷 Camera</button>
+        <button id="src-color">🎨 Color</button>
+      </div>
+      <input type="file" id="file-input" accept="video/*,image/*">
+    </div>
+    
+    <div class="row">
+      <button id="reset-btn" class="secondary">Reset</button>
+      <button id="toggle-corners" class="secondary">Points (P)</button>
+    </div>
+    <div class="row">
+      <button id="toggle-ui">Panel (H)</button>
+      <button id="fullscreen-btn">Fullscreen (F)</button>
+    </div>
+    
+    <div class="info" style="margin-top:auto">
+      <strong>Hotkeys:</strong><br>
+      H — panel | F — fullscreen | R — reset<br>
+      P — points | 1-9 — layer | Del — delete
+    </div>
+  </div>
+  
+  <div id="canvas-wrap">
+    <canvas id="gl"></canvas>
+    <div class="corner" data-idx="0" data-label="TL"></div>
+    <div class="corner" data-idx="1" data-label="TR"></div>
+    <div class="corner" data-idx="2" data-label="BR"></div>
+    <div class="corner" data-idx="3" data-label="BL"></div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gl');
+const wrap = document.getElementById('canvas-wrap');
+const gl = canvas.getContext('webgl', { antialias: true, preserveDrawingBuffer: true });
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+const vsSource = `
+attribute vec2 a_pos;
+varying vec2 v_pos;
+void main() {
+  v_pos = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+const fsSource = `
+precision highp float;
+varying vec2 v_pos;
+uniform sampler2D u_tex;
+uniform vec2 u_corners[4];
+uniform float u_alpha;
+
+vec2 getUV(vec2 p, vec2 c0, vec2 c1, vec2 c2, vec2 c3) {
+  vec2 e = c1 - c0, f = c3 - c0, g = c0 - c1 + c2 - c3, h = p - c0;
+  float k2 = g.x * f.y - g.y * f.x;
+  float k1 = e.x * f.y - e.y * f.x + h.x * g.y - h.y * g.x;
+  float k0 = h.x * e.y - h.y * e.x;
+  float v, u;
+  if (abs(k2) < 0.0001) { v = -k0 / k1; }
+  else {
+    float disc = k1 * k1 - 4.0 * k0 * k2;
+    if (disc < 0.0) return vec2(-1.0);
+    disc = sqrt(disc);
+    float v1 = (-k1 - disc) / (2.0 * k2);
+    float v2 = (-k1 + disc) / (2.0 * k2);
+    v = (v1 >= 0.0 && v1 <= 1.0) ? v1 : v2;
+  }
+  float denom = e.x + g.x * v;
+  u = (abs(denom) < 0.0001) ? (h.y - f.y * v) / (e.y + g.y * v) : (h.x - f.x * v) / denom;
+  return vec2(u, v);
+}
+
+void main() {
+  vec2 uv = getUV(v_pos, u_corners[0], u_corners[1], u_corners[2], u_corners[3]);
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) discard;
+  vec4 c = texture2D(u_tex, uv);
+  gl_FragColor = vec4(c.rgb, c.a * u_alpha);
+}`;
+
+function createShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  return s;
+}
+
+const prog = gl.createProgram();
+gl.attachShader(prog, createShader(gl.VERTEX_SHADER, vsSource));
+gl.attachShader(prog, createShader(gl.FRAGMENT_SHADER, fsSource));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const aPos = gl.getAttribLocation(prog, 'a_pos');
+const uCorners = gl.getUniformLocation(prog, 'u_corners');
+const uAlpha = gl.getUniformLocation(prog, 'u_alpha');
+
+const quadBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, 1,1, -1,1]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+// Layer system
+const COLORS = ['#0f9', '#f90', '#90f', '#0ff', '#f09', '#9f0', '#09f', '#ff0'];
+let layers = [];
+let activeLayerId = null;
+let layerCounter = 0;
+
+function randomColor() {
+  return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+}
+
+function createLayer() {
+  const id = ++layerCounter;
+  const color = COLORS[(id - 1) % COLORS.length];
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  
+  const layer = {
+    id,
+    name: `Layer ${id}`,
+    color,
+    visible: true,
+    corners: [{ x: 0.1, y: 0.1 }, { x: 0.9, y: 0.1 }, { x: 0.9, y: 0.9 }, { x: 0.1, y: 0.9 }],
+    media: null,
+    texture: tex,
+    stream: null
+  };
+  
+  layers.push(layer);
+  setActiveLayer(id);
+  renderLayersList();
+  applyRandomColor(layer);
+  return layer;
+}
+
+function deleteLayer(id) {
+  const idx = layers.findIndex(l => l.id === id);
+  if (idx === -1) return;
+  const layer = layers[idx];
+  if (layer.stream) layer.stream.getTracks().forEach(t => t.stop());
+  gl.deleteTexture(layer.texture);
+  layers.splice(idx, 1);
+  if (activeLayerId === id) activeLayerId = layers[0]?.id || null;
+  renderLayersList();
+  updateCornerPositions();
+  render();
+}
+
+function setActiveLayer(id) {
+  activeLayerId = id;
+  renderLayersList();
+  updateCornerPositions();
+}
+
+function getActiveLayer() {
+  return layers.find(l => l.id === activeLayerId);
+}
+
+function renderLayersList() {
+  const list = document.getElementById('layers-list');
+  list.innerHTML = layers.map(l => `
+    <div class="layer-item ${l.id === activeLayerId ? 'active' : ''}" data-id="${l.id}">
+      <div class="layer-color" style="background:${l.color}"></div>
+      <span class="layer-name">${l.name}</span>
+      <button class="layer-btn vis ${l.visible ? '' : 'off'}" data-id="${l.id}">${l.visible ? '👁' : '👁‍🗨'}</button>
+      <button class="layer-btn del" data-id="${l.id}">×</button>
+    </div>
+  `).join('');
+  
+  list.querySelectorAll('.layer-item').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target.classList.contains('layer-btn')) return;
+      setActiveLayer(+el.dataset.id);
+    });
+  });
+  
+  list.querySelectorAll('.layer-btn.del').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); deleteLayer(+el.dataset.id); });
+  });
+  
+  list.querySelectorAll('.layer-btn.vis').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      const layer = layers.find(l => l.id === +el.dataset.id);
+      if (layer) { layer.visible = !layer.visible; renderLayersList(); render(); }
+    });
+  });
+}
+
+function applyRandomColor(layer) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = randomColor();
+  ctx.fillRect(0, 0, 64, 64);
+  layer.media = c;
+  layer.name = 'Color';
+  renderLayersList();
+  render();
+}
+
+// Corner handling
+const cornerEls = document.querySelectorAll('.corner');
+let dragging = null;
+let cornersVisible = true;
+
+function updateCornerPositions() {
+  const layer = getActiveLayer();
+  const rect = wrap.getBoundingClientRect();
+  
+  cornerEls.forEach((el, i) => {
+    if (layer && cornersVisible) {
+      el.classList.add('visible');
+      el.style.left = layer.corners[i].x * rect.width + 'px';
+      el.style.top = layer.corners[i].y * rect.height + 'px';
+      el.style.background = layer.color;
+      el.style.color = layer.color;
+    } else {
+      el.classList.remove('visible');
+    }
+  });
+}
+
+function handleDrag(clientX, clientY) {
+  if (dragging === null) return;
+  const layer = getActiveLayer();
+  if (!layer) return;
+  const rect = wrap.getBoundingClientRect();
+  layer.corners[dragging].x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  layer.corners[dragging].y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+  updateCornerPositions();
+  render();
+}
+
+cornerEls.forEach(el => {
+  el.addEventListener('mousedown', e => { e.preventDefault(); dragging = +el.dataset.idx; });
+  el.addEventListener('touchstart', e => { e.preventDefault(); dragging = +el.dataset.idx; }, { passive: false });
+});
+
+document.addEventListener('mousemove', e => handleDrag(e.clientX, e.clientY));
+document.addEventListener('touchmove', e => {
+  if (dragging !== null) { e.preventDefault(); handleDrag(e.touches[0].clientX, e.touches[0].clientY); }
+}, { passive: false });
+document.addEventListener('mouseup', () => dragging = null);
+document.addEventListener('touchend', () => dragging = null);
+
+// Render
+function render() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w; canvas.height = h;
+    gl.viewport(0, 0, w, h);
+  }
+  
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  
+  let hasVideo = false;
+  
+  layers.forEach(layer => {
+    if (!layer.visible || !layer.media) return;
+    
+    gl.bindTexture(gl.TEXTURE_2D, layer.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, layer.media);
+    
+    const data = new Float32Array([
+      layer.corners[0].x, 1 - layer.corners[0].y,
+      layer.corners[1].x, 1 - layer.corners[1].y,
+      layer.corners[2].x, 1 - layer.corners[2].y,
+      layer.corners[3].x, 1 - layer.corners[3].y
+    ]);
+    gl.uniform2fv(uCorners, data);
+    gl.uniform1f(uAlpha, 1.0);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+    
+    if (layer.media.tagName === 'VIDEO') hasVideo = true;
+  });
+  
+  if (hasVideo) requestAnimationFrame(render);
+}
+
+// Source buttons
+document.getElementById('src-file').addEventListener('click', () => {
+  document.getElementById('file-input').click();
+});
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const layer = getActiveLayer();
+  if (!layer) return;
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  if (layer.stream) { layer.stream.getTracks().forEach(t => t.stop()); layer.stream = null; }
+  
+  const url = URL.createObjectURL(file);
+  layer.name = file.name.slice(0, 16);
+  renderLayersList();
+  
+  if (file.type.startsWith('video')) {
+    const video = document.createElement('video');
+    video.src = url; video.loop = true; video.muted = true; video.playsInline = true;
+    video.onloadeddata = () => { video.play(); layer.media = video; render(); };
+  } else {
+    const img = new Image();
+    img.onload = () => { layer.media = img; render(); };
+    img.src = url;
+  }
+  e.target.value = '';
+});
+
+// Camera
+document.getElementById('src-camera').addEventListener('click', async () => {
+  const layer = getActiveLayer();
+  if (!layer) return;
+  if (layer.stream) layer.stream.getTracks().forEach(t => t.stop());
+  
+  try {
+    layer.stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1920 }, height: { ideal: 1080 } }
+    });
+    const video = document.createElement('video');
+    video.srcObject = layer.stream;
+    video.playsInline = true;
+    video.onloadedmetadata = () => { video.play(); layer.media = video; layer.name = 'Camera'; renderLayersList(); render(); };
+  } catch (err) { console.error(err); }
+});
+
+// Color
+document.getElementById('src-color').addEventListener('click', () => {
+  const layer = getActiveLayer();
+  if (!layer) return;
+  if (layer.stream) { layer.stream.getTracks().forEach(t => t.stop()); layer.stream = null; }
+  applyRandomColor(layer);
+});
+
+// Reset
+document.getElementById('reset-btn').addEventListener('click', () => {
+  const layer = getActiveLayer();
+  if (!layer) return;
+  layer.corners = [{ x: 0.1, y: 0.1 }, { x: 0.9, y: 0.1 }, { x: 0.9, y: 0.9 }, { x: 0.1, y: 0.9 }];
+  updateCornerPositions();
+  render();
+});
+
+// UI toggle
+const controls = document.getElementById('controls');
+
+function toggleUI() {
+  controls.classList.toggle('hidden');
+}
+
+function toggleCorners() {
+  cornersVisible = !cornersVisible;
+  updateCornerPositions();
+}
+
+document.getElementById('toggle-ui').addEventListener('click', toggleUI);
+document.getElementById('toggle-corners').addEventListener('click', toggleCorners);
+document.getElementById('fullscreen-btn').addEventListener('click', () => {
+  document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+});
+document.getElementById('add-layer-btn').addEventListener('click', createLayer);
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  const key = e.key.toLowerCase();
+  if (key === 'h') toggleUI();
+  if (key === 'f') {
+    document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  }
+  if (key === 'p') toggleCorners();
+  if (key === 'r') {
+    const layer = getActiveLayer();
+    if (layer) {
+      layer.corners = [{ x: 0.1, y: 0.1 }, { x: 0.9, y: 0.1 }, { x: 0.9, y: 0.9 }, { x: 0.1, y: 0.9 }];
+      updateCornerPositions(); render();
+    }
+  }
+  if (key === 'delete' || key === 'backspace') {
+    if (activeLayerId && layers.length > 1) deleteLayer(activeLayerId);
+  }
+  if (key >= '1' && key <= '9') {
+    const idx = +key - 1;
+    if (layers[idx]) setActiveLayer(layers[idx].id);
+  }
+});
+
+window.addEventListener('resize', () => { updateCornerPositions(); render(); });
+
+createLayer();
+</script>
+</body>
+</html>
